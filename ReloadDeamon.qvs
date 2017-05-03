@@ -1,0 +1,142 @@
+/*
+|-------------------------------------------------
+| Force Reload
+|-------------------------------------------------
+|
+| The application will only reload when an end
+| user triggers the process using the extension.
+| To set a default time to refresh the app,
+| change the variable here.
+|
+| Time in minutes, or 0 to ignore this setting.
+|
+*/
+
+LET vForceReload = 0;
+
+/*
+|-------------------------------------------------
+| Path to reloadreference.csv  
+|-------------------------------------------------
+|
+| Set the path to the reloadreference csv file.
+|
+*/
+
+SET vReloadReferencePath = reloadreference1.csv;
+
+/*^^^^^^^TODO^^^^^The above could be put in a config file...*/
+
+/*
+|-------------------------------------------------
+| Check if ref file exists  
+|-------------------------------------------------
+|
+| Use the QVDCreateTime function to determine if the file exists.
+|
+*/
+
+LET vFileExists = NOT isnull(QVDCreateTime('$(vReloadReferencePath)'));
+
+/*
+|-------------------------------------------------
+| Load reference file
+|-------------------------------------------------
+|
+| Load the reference file, if it doesn't exist
+| yet, generate one with new data.
+|
+*/
+
+IF(vFileExists) THEN
+    TRACE ||  Reading from $(vReloadReferencePath);
+    RefData:
+    LOAD 
+          AccessTime 
+         ,PreviousAccessTime
+         ,ReloadFlag
+    FROM
+    [$(vReloadReferencePath)]
+    (txt, utf8, embedded labels, delimiter is ',', msq);
+ELSE
+    TRACE ||  Creating new file and saving to $(vReloadReferencePath);
+    RefData:
+    LOAD 
+          now() AS AccessTime
+         ,now() AS PreviousAccessTime
+         ,1     AS ReloadFlag
+    AutoGenerate 1;
+END IF;
+
+LET AccessTime         = peek('AccessTime',0,'RefData');
+LET PreviousAccessTime = peek('PreviousAccessTime',0,'RefData');
+LET ReloadFlag         = peek('ReloadFlag',0,'RefData');
+
+DROP TABLE RefData;
+
+/*
+|-------------------------------------------------
+| Update the reference file
+|-------------------------------------------------
+|
+| Now we've read the reference file, update it
+| and store a new version
+|
+*/
+
+RefData:
+    LOAD 
+          num(now())      AS AccessTime
+         ,'$(AccessTime)' AS PreviousAccessTime
+         ,0               AS ReloadFlag
+    AutoGenerate 1;
+
+Store RefData into [$(vReloadReferencePath)] (txt);
+
+DROP TABLE RefData;
+
+/*
+|-------------------------------------------------
+| Clean Up
+|-------------------------------------------------
+|
+| Clear the variables used.
+|
+*/
+SUB CleanUp()
+    LET AccessTime         = NULL();
+    LET PreviousAccessTime = NULL();
+    LET ReloadFlag         = NULL();
+EXIT SUB;
+/*
+|-------------------------------------------------
+| Logic Checks
+|-------------------------------------------------
+|
+| Run some logic to determine whether to exit
+| the application or to continue on to a full
+| reload. 
+|
+| 1. Has the reload flag been set to 0 and force
+|    reload is also 0;
+| 2. Is the last reload time greater than the time
+|    set in vForceReload and is vForceReload set to
+|    0.
+| 
+| If either of these test are true, then we can 
+| safely exit, otherwise, continue with the 
+| host application logic.
+*/
+
+IF($(vForceReload)=0 AND $(ReloadFlag)=0) THEN
+    TRACE ||  Exiting as reload flag set to 0 and force reload set to 0;
+    Call CleanUp();
+    EXIT SCRIPT;
+END IF;
+
+IF(Minute(Now()-$(AccessTime))>=$(vForceReload) AND $(ReloadFlag)=0 AND $(vForceReload)<>0) THEN
+    TRACE ||  Exiting as reload flag set to 0 we have not breeched any default reload time;
+    Call CleanUp();
+    EXIT SCRIPT;
+END IF;
+
