@@ -103,11 +103,11 @@ DROP TABLE RefData;
 | Clear the variables used.
 |
 */
-SUB CleanUp()
+SUB CleanUp
     LET AccessTime         = NULL();
     LET PreviousAccessTime = NULL();
     LET ReloadFlag         = NULL();
-EXIT SUB;
+END SUB;
 /*
 |-------------------------------------------------
 | Logic Checks
@@ -130,13 +130,13 @@ EXIT SUB;
 
 IF($(vForceReload)=0 AND $(ReloadFlag)=0) THEN
     TRACE ||  Exiting as reload flag set to 0 and force reload set to 0;
-    Call CleanUp();
+    Call CleanUp;
     EXIT SCRIPT;
 END IF;
 
 IF(Minute(Now()-$(AccessTime))>=$(vForceReload) AND $(ReloadFlag)=0 AND $(vForceReload)<>0) THEN
     TRACE ||  Exiting as reload flag set to 0 we have not breeched any default reload time;
-    Call CleanUp();
+    Call CleanUp;
     EXIT SCRIPT;
 END IF;
 
