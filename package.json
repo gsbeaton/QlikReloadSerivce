@@ -1,0 +1,9 @@
+{
+  "name": "qlikview-reload-on-demand",
+  "description": "A button to allow users to reload a QlikView document on demand.",
+  "version": "0.0.1",
+  "dependencies": {
+    "express": "4.x",
+    "body-parser": "~1.0.1"
+  }
+}
